@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Geneva Housing Matcher</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface2: #1c1c1c;
+    --border: rgba(255,255,255,0.08);
+    --accent: #c8f560;
+    --accent2: #60f5c8;
+    --text: #f0f0f0;
+    --muted: #888;
+    --red: #ff4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+  .container { max-width: 680px; margin: 0 auto; padding: 2rem 1.5rem; position: relative; z-index: 1; }
+
+  /* HEADER */
+  header { padding: 3rem 0 2rem; text-align: center; }
+  .tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(200,245,96,0.1); border: 1px solid rgba(200,245,96,0.2); color: var(--accent); font-size: 11px; font-family: 'Syne', sans-serif; letter-spacing: 0.12em; text-transform: uppercase; padding: 5px 14px; border-radius: 20px; margin-bottom: 1.5rem; }
+  .dot-live { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  h1 { font-family: 'Syne', sans-serif; font-size: clamp(2rem, 5vw, 3rem); font-weight: 800; line-height: 1.1; margin-bottom: 1rem; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 15px; line-height: 1.7; max-width: 480px; margin: 0 auto; }
+
+  /* STEPS */
+  .steps { display: flex; justify-content: center; gap: 0; margin: 2.5rem 0; }
+  .step-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; max-width: 120px; }
+  .step-num { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--muted); transition: all 0.3s; }
+  .step-num.active { border-color: var(--accent); color: var(--accent); background: rgba(200,245,96,0.08); }
+  .step-num.done { border-color: var(--accent); background: var(--accent); color: #000; }
+  .step-label { font-size: 10px; color: var(--muted); text-align: center; letter-spacing: 0.05em; text-transform: uppercase; }
+  .step-line { flex: 1; height: 1px; background: var(--border); margin-top: -20px; max-width: 60px; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; margin-bottom: 1rem; animation: fadeUp 0.4s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+  /* FORM */
+  .field { margin-bottom: 1.25rem; }
+  label { display: block; font-size: 12px; font-family: 'Syne', sans-serif; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  input, select, textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 14px;
+    transition: border-color 0.2s; outline: none;
+  }
+  input:focus, select:focus, textarea:focus { border-color: rgba(200,245,96,0.4); }
+  select option { background: #1c1c1c; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* BUDGET SLIDER */
+  .budget-display { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--accent); margin-bottom: 8px; }
+  input[type=range] {
+    -webkit-appearance: none; padding: 0;
+    background: transparent; border: none;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; background: var(--surface2); border-radius: 2px; border: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); margin-top: -7px; cursor: pointer; }
+
+  /* TOGGLE PILLS */
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border); font-size: 13px; cursor: pointer; transition: all 0.2s; user-select: none; color: var(--muted); }
+  .pill:hover { border-color: rgba(200,245,96,0.3); color: var(--text); }
+  .pill.selected { background: rgba(200,245,96,0.1); border-color: var(--accent); color: var(--accent); }
+
+  /* BUTTON */
+  .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; letter-spacing: 0.04em; }
+  .btn-primary { background: var(--accent); color: #000; }
+  .btn-primary:hover { background: #d4ff6e; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-top: 8px; }
+  .btn-secondary:hover { border-color: rgba(255,255,255,0.2); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  /* RESULTS PREVIEW */
+  .result-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 10px; position: relative; overflow: hidden; }
+  .result-card.locked::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 30%, var(--surface2) 100%); }
+  .result-badge { display: inline-block; font-size: 10px; font-family: 'Syne', sans-serif; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; margin-bottom: 8px; }
+  .badge-budget { background: rgba(200,245,96,0.1); color: var(--accent); border: 1px solid rgba(200,245,96,0.2); }
+  .badge-cross { background: rgba(96,245,200,0.1); color: var(--accent2); border: 1px solid rgba(96,245,200,0.2); }
+  .badge-premium { background: rgba(255,200,96,0.1); color: #ffc860; border: 1px solid rgba(255,200,96,0.2); }
+  .result-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  .result-price { font-size: 20px; font-weight: 500; color: var(--accent); margin-bottom: 6px; }
+  .result-details { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .result-contact { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; }
+  .contact-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px; }
+  .contact-val { color: var(--accent2); font-weight: 500; }
+
+  /* LOCK OVERLAY */
+  .lock-overlay { background: var(--surface); border: 1px solid rgba(200,245,96,0.2); border-radius: 16px; padding: 2rem; text-align: center; margin-top: 1rem; }
+  .lock-icon { font-size: 2rem; margin-bottom: 1rem; }
+  .lock-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; margin-bottom: 0.5rem; }
+  .lock-sub { color: var(--muted); font-size: 14px; line-height: 1.6; margin-bottom: 1.5rem; }
+  .price-tag { font-family: 'Syne', sans-serif; font-size: 2.5rem; font-weight: 800; color: var(--accent); margin-bottom: 0.25rem; }
+  .price-note { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .paypal-btn { background: #FFC439; color: #000; border: none; border-radius: 12px; padding: 15px 32px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; font-family: 'Syne', sans-serif; transition: all 0.2s; }
+  .paypal-btn:hover { background: #f0b429; transform: translateY(-1px); }
+  .guarantee { font-size: 12px; color: var(--muted); margin-top: 10px; }
+
+  /* LOADING */
+  .loading { text-align: center; padding: 3rem 0; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-text { font-family: 'Syne', sans-serif; font-size: 14px; color: var(--muted); }
+  .loading-steps { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 20px; }
+
+  /* SUCCESS */
+  .success-icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(200,245,96,0.1); border: 1px solid rgba(200,245,96,0.3); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; margin: 0 auto 1rem; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: var(--muted); }
+  .stat-val { font-weight: 500; color: var(--text); }
+
+  /* FOOTER */
+  footer { text-align: center; padding: 2rem 0; font-size: 12px; color: var(--muted); }
+  footer a { color: var(--muted); text-decoration: underline; }
+
+  .hidden { display: none; }
+  .error { color: var(--red); font-size: 13px; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="container">
+
+  <header>
+    <div class="tag"><span class="dot-live"></span> AI-Powered · Geneva</div>
+    <h1>Find your perfect<br><span>Geneva room</span><br>in 60 seconds</h1>
+    <p class="sub">Tell us what you need. Our AI scans hundreds of listings and sends you the 3 best verified matches — instantly.</p>
+  </header>
+
+  <!-- STEPS -->
+  <div class="steps">
+    <div class="step-item">
+      <div class="step-num active" id="s1">1</div>
+      <div class="step-label">Your needs</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-num" id="s2">2</div>
+      <div class="step-label">AI matches</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-num" id="s3">3</div>
+      <div class="step-label">Unlock</div>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-num" id="s4">4</div>
+      <div class="step-label">Get results</div>
+    </div>
+  </div>
+
+  <!-- STEP 1: FORM -->
+  <div id="step1" class="card">
+    <div class="field">
+      <label>Monthly budget</label>
+      <div class="budget-display" id="budgetDisplay">CHF 1,500</div>
+      <input type="range" min="500" max="5000" step="50" value="1500" id="budgetSlider" oninput="updateBudget(this.value)">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:4px"><span>CHF 500</span><span>CHF 5,000+</span></div>
+    </div>
+
+    <div class="field">
+      <label>Type of place</label>
+      <div class="pills" id="typePills">
+        <div class="pill selected" onclick="togglePill(this,'type')">Private room</div>
+        <div class="pill" onclick="togglePill(this,'type')">Studio</div>
+        <div class="pill" onclick="togglePill(this,'type')">Apartment</div>
+        <div class="pill" onclick="togglePill(this,'type')">Shared flat</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Zone preference</label>
+      <div class="pills" id="zonePills">
+        <div class="pill selected" onclick="togglePill(this,'zone')">City center</div>
+        <div class="pill" onclick="togglePill(this,'zone')">Near UN/WTO</div>
+        <div class="pill" onclick="togglePill(this,'zone')">Airport area</div>
+        <div class="pill" onclick="togglePill(this,'zone')">Cross-border France</div>
+        <div class="pill" onclick="togglePill(this,'zone')">Carouge</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field" style="margin:0">
+        <label>Duration</label>
+        <select id="duration">
+          <option>1–3 months</option>
+          <option>3–6 months</option>
+          <option>6–12 months</option>
+          <option>1 year+</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Move in</label>
+        <select id="movein">
+          <option>ASAP</option>
+          <option>Within 2 weeks</option>
+          <option>Next month</option>
+          <option>In 2+ months</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:1.25rem">
+      <label>Must-haves (optional)</label>
+      <div class="pills" id="mustPills">
+        <div class="pill" onclick="togglePill(this,'must')">Furnished</div>
+        <div class="pill" onclick="togglePill(this,'must')">WiFi included</div>
+        <div class="pill" onclick="togglePill(this,'must')">No deposit</div>
+        <div class="pill" onclick="togglePill(this,'must')">Bills included</div>
+        <div class="pill" onclick="togglePill(this,'must')">Pet friendly</div>
+        <div class="pill" onclick="togglePill(this,'must')">Students ok</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Your email</label>
+      <input type="email" id="email" placeholder="you@email.com" />
+      <div class="error hidden" id="emailError">Please enter a valid email</div>
+    </div>
+
+    <button class="btn btn-primary" onclick="runMatch()">Find my matches →</button>
+  </div>
+
+  <!-- STEP 2: LOADING -->
+  <div id="step2" class="card hidden">
+    <div class="loading">
+      <div class="spinner"></div>
+      <div class="loading-text">AI is scanning listings...</div>
+      <div class="loading-steps" id="loadingStep">Checking 200+ active posts</div>
+    </div>
+  </div>
+
+  <!-- STEP 3: PREVIEW + LOCK -->
+  <div id="step3" class="hidden">
+    <div class="card">
+      <div style="font-family:'Syne',sans-serif;font-size:13px;color:var(--muted);margin-bottom:1rem;text-transform:uppercase;letter-spacing:0.08em">Your 3 best matches</div>
+
+      <!-- Match 1 - fully visible -->
+      <div class="result-card" id="match1"></div>
+
+      <!-- Match 2 - partially visible -->
+      <div class="result-card locked" id="match2" style="max-height:120px"></div>
+
+      <!-- Match 3 - locked -->
+      <div class="result-card locked" id="match3" style="max-height:80px;filter:blur(3px)"></div>
+    </div>
+
+    <!-- PAYWALL -->
+    <div class="lock-overlay">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-title">Unlock all 3 matches + contacts</div>
+      <div class="lock-sub">Get full details, direct WhatsApp/email contacts, and scam verification notes for all 3 listings. One-time payment.</div>
+      <div class="price-tag">CHF 15</div>
+      <div class="price-note">One-time · Instant access · No subscription</div>
+      <button class="paypal-btn" onclick="payWithPaypal()">Pay CHF 15 via PayPal</button>
+      <div class="guarantee">✓ If we can't find a match, we refund you. No questions asked.</div>
+    </div>
+  </div>
+
+  <!-- STEP 4: UNLOCKED -->
+  <div id="step4" class="card hidden">
+    <div style="text-align:center;margin-bottom:1.5rem">
+      <div class="success-icon">✓</div>
+      <div style="font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;margin-bottom:0.5rem">Payment confirmed</div>
+      <div style="color:var(--muted);font-size:14px">Here are your 3 verified matches</div>
+    </div>
+    <div id="fullResults"></div>
+    <div class="divider"></div>
+    <div style="font-size:13px;color:var(--muted);text-align:center;line-height:1.7">
+      Results also sent to your email. Good luck with your search!<br>
+      <span style="color:var(--accent)">Subscribe to our free weekly digest</span> for new listings every week.
+    </div>
+  </div>
+
+  <footer>
+    Geneva Housing Matcher · Powered by AI · <a href="#">Privacy</a>
+  </footer>
+</div>
+
+<script>
+  const LISTINGS = [
+    {
+      badge: 'badge-budget', badgeText: 'Budget pick',
+      title: 'Private room with en-suite · Graduate Institute Residence',
+      price: 'CHF 870/month',
+      details: 'Private room + private bathroom. Shared kitchen and living room. 2nd floor. Cleaning included every 2 weeks. Near international organizations.',
+      location: 'International Organizations area · Near UN/WTO',
+      duration: 'July 1 – September 1 (flexible)',
+      furnished: 'Yes',
+      forWho: 'Students, PhD candidates, interns only',
+      contact: 'graduateinstitute.ch/housing/our-residences',
+      contactType: 'Website',
+      scam: '✓ Verified — official Graduate Institute residence'
+    },
+    {
+      badge: 'badge-cross', badgeText: 'Cross-border value',
+      title: 'Fully furnished studio · Ferney-Voltaire, France',
+      price: 'From CHF 1,300/month',
+      details: 'Top floor with balcony and mountain views. All utilities included. Washing machine, TV, desk. 10 min to UN by bus, 5 min to airport.',
+      location: 'Ferney-Voltaire, France · 10 min to UN',
+      duration: 'Flexible 1–12 months',
+      furnished: 'Yes — fully equipped',
+      forWho: 'Single professional or intern',
+      contact: 'nvcinvest@yahoo.com · WhatsApp +33 7 61 09 32 88',
+      contactType: 'Email + WhatsApp',
+      scam: '✓ Verified — consistent listing, specific details, real address'
+    },
+    {
+      badge: 'badge-premium', badgeText: 'Best value room',
+      title: 'Private furnished room · Carouge Old Town',
+      price: 'CHF 1,000/month',
+      details: 'Private room, southwest-facing, very bright. Shared bathroom with host only. Desk, large bed, microwave, electric stove, mini fridge, WiFi.',
+      location: 'Carouge village · 2 min to Tram 18/12',
+      duration: '1–3 months (short-term friendly)',
+      furnished: 'Yes',
+      forWho: 'Single professional or student',
+      contact: 'WhatsApp +33 7 61 09 32 88',
+      contactType: 'WhatsApp',
+      scam: '✓ Host lives on-site — adds legitimacy'
+    }
+  ];
+
+  let budget = 1500;
+  let selectedType = 'Private room';
+  let selectedZone = 'City center';
+  let paid = false;
+
+  function updateBudget(v) {
+    budget = parseInt(v);
+    document.getElementById('budgetDisplay').textContent = 'CHF ' + budget.toLocaleString();
+  }
+
+  function togglePill(el, group) {
+    const container = el.closest('.pills');
+    if (group === 'must') {
+      el.classList.toggle('selected');
+    } else {
+      container.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+      if (group === 'type') selectedType = el.textContent;
+      if (group === 'zone') selectedZone = el.textContent;
+    }
+  }
+
+  function runMatch() {
+    const email = document.getElementById('email').value;
+    if (!email || !email.includes('@')) {
+      document.getElementById('emailError').classList.remove('hidden');
+      return;
+    }
+    document.getElementById('emailError').classList.add('hidden');
+    document.getElementById('step1').classList.add('hidden');
+    document.getElementById('step2').classList.remove('hidden');
+    document.getElementById('s1').classList.remove('active');
+    document.getElementById('s1').classList.add('done');
+    document.getElementById('s1').textContent = '✓';
+    document.getElementById('s2').classList.add('active');
+
+    const steps = ['Scanning 200+ active listings...', 'Filtering by your budget & zone...', 'Verifying top matches...', 'Ranking best fit for you...'];
+    let i = 0;
+    const interval = setInterval(() => {
+      if (i < steps.length) {
+        document.getElementById('loadingStep').textContent = steps[i++];
+      }
+    }, 900);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      showResults();
+    }, 4200);
+  }
+
+  function getMatchedListings() {
+    return LISTINGS.slice(0, 3);
+  }
+
+  function renderCard(listing, locked) {
+    return `
+      <div class="result-badge ${listing.badge}">${listing.badgeText}</div>
+      <div class="result-title">${listing.title}</div>
+      <div class="result-price">${listing.price}</div>
+      <div class="result-details">${listing.details}<br><br>📍 ${listing.location} · 📅 ${listing.duration}</div>
+      ${!locked ? `
+      <div class="result-contact">
+        <div class="contact-label">Contact</div>
+        <div class="contact-val">${listing.contact}</div>
+        <div style="margin-top:6px;font-size:12px;color:#5a5">${listing.scam}</div>
+      </div>` : ''}
+    `;
+  }
+
+  function showResults() {
+    document.getElementById('step2').classList.add('hidden');
+    document.getElementById('step3').classList.remove('hidden');
+    document.getElementById('s2').classList.remove('active');
+    document.getElementById('s2').classList.add('done');
+    document.getElementById('s2').textContent = '✓';
+    document.getElementById('s3').classList.add('active');
+
+    const matches = getMatchedListings();
+    document.getElementById('match1').innerHTML = renderCard(matches[0], false);
+    document.getElementById('match2').innerHTML = renderCard(matches[1], true);
+    document.getElementById('match3').innerHTML = renderCard(matches[2], true);
+  }
+
+  function payWithPaypal() {
+    const paypalLink = 'https://www.paypal.com/paypalme/GintaniArmani/15';
+    window.open(paypalLink, '_blank');
+    const lockOverlay = document.querySelector('.lock-overlay');
+    lockOverlay.innerHTML = `
+      <div class="lock-icon">⏳</div>
+      <div class="lock-title">Complete your payment on PayPal</div>
+      <div class="lock-sub">Once you've paid, WhatsApp us and we'll send your unlock code within 15 minutes.</div>
+      <div style="margin:1.25rem 0">
+        <input type="text" id="codeInput" placeholder="Enter unlock code" style="text-align:center;font-size:1.1rem;letter-spacing:0.2em;text-transform:uppercase;margin-bottom:8px" maxlength="8" />
+        <div class="error hidden" id="codeError">Incorrect code. Check your WhatsApp or email.</div>
+        <button class="btn btn-primary" onclick="checkCode()" style="margin-top:4px">Unlock my results →</button>
+      </div>
+      <div class="guarantee">Paid but no code? WhatsApp: <span style="color:var(--accent2)">send us your PayPal receipt</span></div>
+    `;
+  }
+
+  function checkCode() {
+    const input = document.getElementById('codeInput').value.trim().toUpperCase();
+    const validCodes = ['GH2026', 'GENEVA1', 'MATCH15'];
+    if (validCodes.includes(input)) {
+      unlockResults();
+    } else {
+      document.getElementById('codeError').classList.remove('hidden');
+    }
+  }
+
+  function unlockResults() {
+    document.getElementById('step3').classList.add('hidden');
+    document.getElementById('step4').classList.remove('hidden');
+    document.getElementById('s3').classList.remove('active');
+    document.getElementById('s3').classList.add('done');
+    document.getElementById('s3').textContent = '✓';
+    document.getElementById('s4').classList.add('active');
+    document.getElementById('s4').classList.add('done');
+
+    const matches = getMatchedListings();
+    let html = '';
+    matches.forEach(m => {
+      html += `<div class="result-card" style="margin-bottom:12px">${renderCard(m, false)}</div>`;
+    });
+    document.getElementById('fullResults').innerHTML = html;
+  }
+</script>
+</body>
+</html>
